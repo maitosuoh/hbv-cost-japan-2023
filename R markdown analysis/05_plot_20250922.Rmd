@@ -1,0 +1,86 @@
+---
+title: "HBV"
+output: html_document
+date: "2025-09-22"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(readxl)
+library(openxlsx)
+library(stringi)
+library(patchwork)
+```
+
+
+```{r}
+list.files("../plot")
+```
+
+```{r}
+# read RDS
+
+rds_name <- list.files("../plot") %>% str_subset("RDS") %>% str_remove("\\.RDS")
+
+rds_name
+```
+
+```{r}
+rds_path <- paste0("../plot/", rds_name, ".RDS")
+```
+
+```{r}
+for (i in 1:length(rds_name)){
+  assign(rds_name[i] %>% str_remove("_[:digit:]+$")　, readRDS(rds_path[i]))
+}
+```
+
+# read BOJ
+
+```{r}
+p1 <- p1_a1 + p1_a2 + p1_a3 + p1_b1 +  p1_b2 + p1_c1 + p1_c2 + p1_d1 + p1_d2 +
+  
+plot_layout(design = "
+            AABBCCCCC
+            AABBCCCCC
+            AABBCCCCC
+            AABBCCCCC
+            AABBCCCCC
+            AABBCCCCC
+            AABBCCCCC
+            AABBCCCCC
+            AABBCCCCC
+            DDDDEEEEE
+            DDDDEEEEE
+            DDDDEEEEE
+            DDDDEEEEE
+            DDDDEEEEE
+            DDDDEEEEE
+            DDDDEEEEE
+            DDDDEEEEE
+            DDDDEEEEE
+            DDDDEEEEE
+            DDDDEEEEE
+            DDDDEEEEE
+            DDDDEEEEE
+            FFFFGGGGG
+            FFFFGGGGG
+            FFFFGGGGG
+            FFFFGGGGG
+            FFFFGGGGG
+            FFFFGGGGG
+            FFFFGGGGG
+            FFFFGGGGG
+            HHHHIIIII
+            HHHHIIIII
+            HHHHIIIII
+            HHHHIIIII
+            HHHHIIIII
+            HHHHIIIII")
+
+ggsave("../figure/p1.pdf", p1, width = 174, height = 234, unit = "mm")
+```
