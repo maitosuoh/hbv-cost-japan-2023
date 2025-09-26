@@ -1,0 +1,297 @@
+---
+title: "HBV 2023"
+output: html_document
+date: "2025-09-22"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+```
+
+```{r}
+# create directories
+
+dir.create("../xlsx", showWarnings = TRUE, recursive = FALSE, mode = "0777")
+```
+
+
+```{r}
+# create folders
+
+folder_name <- c("visit",
+                 "admission",
+                 "supervision",
+                 "test",
+                 "image",
+                 "prescription",
+                 "inject",
+                 "surgery",
+                 "anesthesia",
+                 "pharmacy",
+                 "oral",
+                 "injection")
+```
+
+```{r}
+folder_path <- paste0("../xlsx/", folder_name)
+```
+
+```{r}
+for (i in 1:length(folder_path)){
+  dir.create(folder_path[i], showWarnings = TRUE, recursive = FALSE, mode = "0777")
+}
+```
+
+
+```{r}
+# A basic fee (visit)
+# https://www.mhlw.go.jp/content/12400000/001492951.xlsx
+
+# A basic admission
+# https://www.mhlw.go.jp/content/12400000/001492997.xlsx
+
+# B Medical supervision charges
+# https://www.mhlw.go.jp/content/12400000/001493073.xlsx
+
+# D test
+# https://www.mhlw.go.jp/content/12400000/001493092.xlsx
+
+# E image
+# https://www.mhlw.go.jp/content/12400000/001493127.xlsx
+
+# F prescription
+# https://www.mhlw.go.jp/content/12400000/001493135.xlsx
+
+# G inject
+# https://www.mhlw.go.jp/content/12400000/001495461.xlsx
+
+# K surgery
+# https://www.mhlw.go.jp/content/12400000/001493186.xlsx
+
+# L anesthesia
+# https://www.mhlw.go.jp/content/12400000/001493239.xlsx
+
+# pharmacy
+# https://www.mhlw.go.jp/content/12400000/001496945.xlsx
+
+# oral
+# https://www.mhlw.go.jp/content/12400000/001495390.xlsx
+
+# injection
+# https://www.mhlw.go.jp/content/12400000/001493140.xlsx
+
+
+url_dem <- c("https://www.mhlw.go.jp/content/12400000/001492951.xlsx",
+            "https://www.mhlw.go.jp/content/12400000/001492997.xlsx",
+            "https://www.mhlw.go.jp/content/12400000/001493073.xlsx",
+            "https://www.mhlw.go.jp/content/12400000/001493092.xlsx",
+            "https://www.mhlw.go.jp/content/12400000/001493127.xlsx",
+            "https://www.mhlw.go.jp/content/12400000/001493135.xlsx",
+            "https://www.mhlw.go.jp/content/12400000/001495461.xlsx",
+            "https://www.mhlw.go.jp/content/12400000/001493186.xlsx",
+            "https://www.mhlw.go.jp/content/12400000/001493239.xlsx",
+            "https://www.mhlw.go.jp/content/12400000/001496945.xlsx",
+            "https://www.mhlw.go.jp/content/12400000/001495390.xlsx",
+            "https://www.mhlw.go.jp/content/12400000/001493140.xlsx")
+
+unique(url_dem) %>% length()
+```
+
+```{r}
+file_dem <- url_dem %>% str_extract("00[:digit:]+\\.xlsx")
+
+path_dem <- paste0("../xlsx/", folder_name, "/", file_dem)
+```
+
+```{r}
+for (i in 1:length(url_dem)){
+  download.file(url_dem[i], path_dem[i], mode = "wb")
+  print(paste(file_dem[i], "downloaded"))
+}
+```
+
+
+```{r}
+# create directories
+dir.create("../xlsx/dpc", showWarnings = TRUE, recursive = FALSE, mode = "0777")
+```
+
+```{r}
+# create DPC folder for 
+folder_dpc_path <- paste0("../xlsx/dpc/", 2022:2025)
+```
+
+```{r}
+for (i in 1:length(folder_dpc_path)){
+  dir.create(folder_dpc_path[i], showWarnings = TRUE, recursive = FALSE, mode = "0777")
+}
+```
+
+
+```{r}
+#https://www.mhlw.go.jp/stf/seisakunitsuite/bunya/0000198757_00004.html
+
+# 2022
+
+# 診断群分類（DPC）電子点数表（正式版）（令和4年3月18日更新）
+# https://www.mhlw.go.jp/content/12400000/001348044.xlsx
+
+# 診断群分類（DPC）電子点数表（正式版）（令和4年4月19日更新）
+# https://www.mhlw.go.jp/content/12400000/001348045.xlsx
+
+# 診断群分類（DPC）電子点数 表（正式版）（令和4年5月24日更新）
+# https://www.mhlw.go.jp/content/12400000/001348046.xlsx
+
+# 診断群分類（DPC）電子点数表（正式版）（令和4年8月17日更新）
+# https://www.mhlw.go.jp/content/12400000/001348047.xlsx
+
+# 診断群分類（DPC）電子点数表（正式版）（令和4年11月15日更新）
+# https://www.mhlw.go.jp/content/12400000/001348048.xlsx
+
+
+url_dpc_2022 <- c("https://www.mhlw.go.jp/content/12400000/001348044.xlsx",
+                  "https://www.mhlw.go.jp/content/12400000/001348045.xlsx",
+                  "https://www.mhlw.go.jp/content/12400000/001348046.xlsx",
+                  "https://www.mhlw.go.jp/content/12400000/001348047.xlsx",
+                  "https://www.mhlw.go.jp/content/12400000/001348048.xlsx")
+```
+
+```{r}
+file_dpc_2022 <- url_dpc_2022 %>% str_extract("00[:digit:]+\\.xlsx")
+
+path_dpc_2022 <- paste0("../xlsx/dpc/2022/", file_dpc_2022)
+```
+
+```{r}
+for (i in 1:length(url_dpc_2022)){
+  download.file(url_dpc_2022[i], path_dpc_2022[i], mode = "wb")
+  print(paste(file_dpc_2022[i], "downloaded"))
+}
+```
+
+
+```{r}
+# https://www.mhlw.go.jp/stf/seisakunitsuite/bunya/0000198757_00004.html
+
+
+# 2023 DPC
+
+# 診断群分類（DPC）電子点数表（正式版）（令和5年3月14日更新）
+# https://www.mhlw.go.jp/content/12400000/001348049.xlsx
+
+# 診断群分類（DPC）電子点数表（正式版）（令和5年5月24日更新）
+# https://www.mhlw.go.jp/content/12400000/001348050.xlsx
+
+# 診断群分類（DPC）電子点数表（正式版）（令和5年8月29日更新）
+# https://www.mhlw.go.jp/content/12400000/001348051.xlsx
+
+# 診断群分類（DPC）電子点数表（正式版）（令和5年11月21日更新）
+# https://www.mhlw.go.jp/content/12400000/001348052.xlsx
+
+# 診断群分類（DPC）電子点数表（正式版）（令和5年12月19日更新）
+# https://www.mhlw.go.jp/content/12400000/001348053.xlsx
+
+url_dpc_2023 <- c(
+             "https://www.mhlw.go.jp/content/12400000/001348049.xlsx",
+             "https://www.mhlw.go.jp/content/12400000/001348050.xlsx",
+             "https://www.mhlw.go.jp/content/12400000/001348051.xlsx",
+             "https://www.mhlw.go.jp/content/12400000/001348052.xlsx",
+             "https://www.mhlw.go.jp/content/12400000/001348053.xlsx")
+```
+
+
+```{r}
+file_dpc_2023 <- url_dpc_2023 %>% str_extract("00[:digit:]+\\.xlsx")
+
+path_dpc_2023 <- paste0("../xlsx/dpc/2023/", file_dpc_2023)
+```
+
+
+
+```{r}
+for (i in 1:length(url_dpc_2023)){
+  download.file(url_dpc_2023[i], path_dpc_2023[i], mode = "wb")
+  print(paste(file_dpc_2023[i], "downloaded"))
+}
+```
+
+```{r}
+# https://www.mhlw.go.jp/stf/seisakunitsuite/bunya/0000198757_00008.html
+
+# 2024
+
+
+# 診断群分類（DPC）電子点数表（令和６年３月21日更新）
+# https://www.mhlw.go.jp/content/12400000/001334354.xlsx
+
+# 診断群分類（DPC）電子点数表（令和６年４月16日更新）
+# https://www.mhlw.go.jp/content/12400000/001334364.xlsx
+
+# 診断群分類（DPC）電子点数表（令和６年５月21日更新）
+# https://www.mhlw.go.jp/content/12400000/001334365.xlsx
+
+# 診断群分類（DPC）電子点数表（令和６年８月14日更新）
+# https://www.mhlw.go.jp/content/12400000/001334367.xlsx
+
+# 診断群分類（DPC）電子点数表（令和６年11月19日更新）
+# https://www.mhlw.go.jp/content/12400000/001334368.xlsx
+
+
+url_dpc_2024 <- c(
+             "https://www.mhlw.go.jp/content/12400000/001334354.xlsx",
+             "https://www.mhlw.go.jp/content/12400000/001334364.xlsx",
+             "https://www.mhlw.go.jp/content/12400000/001334365.xlsx",
+             "https://www.mhlw.go.jp/content/12400000/001334367.xlsx",
+             "https://www.mhlw.go.jp/content/12400000/001334368.xlsx")
+```
+
+```{r}
+file_dpc_2024 <- url_dpc_2024 %>% str_extract("00[:digit:]+\\.xlsx")
+
+path_dpc_2024 <- paste0("../xlsx/dpc/2024/", file_dpc_2024)
+```
+
+```{r}
+for (i in 1:length(url_dpc_2024)){
+  download.file(url_dpc_2024[i], path_dpc_2024[i], mode = "wb")
+  print(paste(file_dpc_2024[i], "downloaded"))
+}
+```
+
+
+
+
+
+```{r}
+# 2025 
+
+
+
+# 診断群分類（DPC）電子点数表（令和７年３月18日更新）
+# https://www.mhlw.go.jp/content/12400000/001452318.xlsx
+
+# 診断群分類（DPC）電子点数表（令和７年４月15日更新）
+# https://www.mhlw.go.jp/content/12400000/001476495.xlsx
+
+url_dpc_2025 <- c(
+             "https://www.mhlw.go.jp/content/12400000/001452318.xlsx",
+             "https://www.mhlw.go.jp/content/12400000/001476495.xlsx")
+```
+
+```{r}
+file_dpc_2025 <- url_dpc_2025 %>% str_extract("00[:digit:]+\\.xlsx")
+
+path_dpc_2025 <- paste0("../xlsx/dpc/2025/", file_dpc_2025)
+```
+
+```{r}
+for (i in 1:length(url_dpc_2025)){
+  download.file(url_dpc_2025[i], path_dpc_2025[i], mode = "wb")
+  print(paste(file_dpc_2025[i], "downloaded"))
+}
+```
+

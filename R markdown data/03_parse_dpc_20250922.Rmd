@@ -1,0 +1,577 @@
+---
+title: "HBV 2023"
+output: html_document
+date: "2025-09-22"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(RCurl)
+library(tidyverse)
+library(XML)
+library(xml2)
+library(rvest)
+library(readxl)
+library(openxlsx)
+
+library(stringi)
+```
+
+
+```{r}
+list.files("../xlsx/dpc")
+```
+
+```{r}
+folder_dpc_all <- list.files("../xlsx/dpc")
+
+folder_dpc_all
+```
+
+```{r}
+# create folder for each file under year
+
+dir.create("../rds/dpc", showWarnings = TRUE, recursive = FALSE, mode = "0777")
+```
+
+```{r}
+#for (i in as.character(2023:2025)){
+#  dir.create(paste0("../rds/dpc/", i),
+#             showWarnings = TRUE, recursive = FALSE, mode = "0777")
+#}
+```
+
+
+```{r}
+path_dpc_list <- map(folder_dpc_all, function(x){
+  
+  folder_path <- paste0("../xlsx/dpc/", x)
+  
+  file_name <- list.files(folder_path)
+  
+  xlsx_path <- paste0(folder_path, "/", file_name)
+  
+  return(xlsx_path)
+  
+})
+
+path_dpc_list
+```
+```{r}
+path_dpc_list %>%
+  unlist() %>% unique()
+
+```
+
+
+```{r}
+df_file <- path_dpc_list %>%
+  unlist() %>%
+  unique() %>%
+  as_tibble() %>%
+  rename(PATH = "value")
+```
+
+```{r}
+df_file <- df_file %>%
+  mutate(YEAR = str_extract(PATH, "(?<=dpc\\/)[:digit:]{4}")) %>%
+  mutate(FILE = str_extract(PATH, "(?<=\\/)[:digit:]+(?=\\.xlsx)"))
+
+df_file 
+```
+
+
+
+```{r}
+# add date infrmation
+
+# 2022
+
+# 診断群分類（DPC）電子点数表（正式版）（令和4年3月18日更新）
+# https://www.mhlw.go.jp/content/12400000/001348044.xlsx
+
+# 診断群分類（DPC）電子点数表（正式版）（令和4年4月19日更新）
+# https://www.mhlw.go.jp/content/12400000/001348045.xlsx
+
+# 診断群分類（DPC）電子点数 表（正式版）（令和4年5月24日更新）
+# https://www.mhlw.go.jp/content/12400000/001348046.xlsx
+
+# 診断群分類（DPC）電子点数表（正式版）（令和4年8月17日更新）
+# https://www.mhlw.go.jp/content/12400000/001348047.xlsx
+
+
+# 2023 DPC
+
+# 診断群分類（DPC）電子点数表（正式版）（令和4年11月15日更新）
+# https://www.mhlw.go.jp/content/12400000/001348048.xlsx
+
+# 診断群分類（DPC）電子点数表（正式版）（令和5年3月14日更新）
+# https://www.mhlw.go.jp/content/12400000/001348049.xlsx
+
+# 診断群分類（DPC）電子点数表（正式版）（令和5年5月24日更新）
+# https://www.mhlw.go.jp/content/12400000/001348050.xlsx
+
+# 診断群分類（DPC）電子点数表（正式版）（令和5年8月29日更新）
+# https://www.mhlw.go.jp/content/12400000/001348051.xlsx
+
+# 診断群分類（DPC）電子点数表（正式版）（令和5年11月21日更新）
+# https://www.mhlw.go.jp/content/12400000/001348052.xlsx
+
+# 診断群分類（DPC）電子点数表（正式版）（令和5年12月19日更新）
+# https://www.mhlw.go.jp/content/12400000/001348053.xlsx
+
+# 診断群分類（DPC）電子点数表（令和６年３月21日更新）
+# https://www.mhlw.go.jp/content/12400000/001334354.xlsx
+
+# 診断群分類（DPC）電子点数表（令和６年４月16日更新）
+# https://www.mhlw.go.jp/content/12400000/001334364.xlsx
+
+# 診断群分類（DPC）電子点数表（令和６年５月21日更新）
+# https://www.mhlw.go.jp/content/12400000/001334365.xlsx
+
+# 診断群分類（DPC）電子点数表（令和６年８月14日更新）
+# https://www.mhlw.go.jp/content/12400000/001334367.xlsx
+
+# 診断群分類（DPC）電子点数表（令和６年11月19日更新）
+# https://www.mhlw.go.jp/content/12400000/001334368.xlsx
+
+# 診断群分類（DPC）電子点数表（令和７年３月18日更新）
+# https://www.mhlw.go.jp/content/12400000/001452318.xlsx
+
+# 診断群分類（DPC）電子点数表（令和７年４月15日更新）
+# https://www.mhlw.go.jp/content/12400000/001476495.xlsx
+
+
+dpc_file_name <- c("https://www.mhlw.go.jp/content/12400000/001348044.xlsx",
+                   "https://www.mhlw.go.jp/content/12400000/001348045.xlsx",
+                   "https://www.mhlw.go.jp/content/12400000/001348046.xlsx",
+                   "https://www.mhlw.go.jp/content/12400000/001348047.xlsx",
+                   "https://www.mhlw.go.jp/content/12400000/001348048.xlsx",
+                   "https://www.mhlw.go.jp/content/12400000/001348049.xlsx",
+                   "https://www.mhlw.go.jp/content/12400000/001348050.xlsx",
+                   "https://www.mhlw.go.jp/content/12400000/001348051.xlsx",
+                   "https://www.mhlw.go.jp/content/12400000/001348052.xlsx",
+                   "https://www.mhlw.go.jp/content/12400000/001348053.xlsx",
+                   "https://www.mhlw.go.jp/content/12400000/001334354.xlsx",
+                   "https://www.mhlw.go.jp/content/12400000/001334364.xlsx",
+                   "https://www.mhlw.go.jp/content/12400000/001334365.xlsx",
+                   "https://www.mhlw.go.jp/content/12400000/001334367.xlsx",
+                   "https://www.mhlw.go.jp/content/12400000/001334368.xlsx",
+                   "https://www.mhlw.go.jp/content/12400000/001452318.xlsx",
+                   "https://www.mhlw.go.jp/content/12400000/001476495.xlsx") %>%
+  str_extract("(?<=\\/)[:digit:]+(?=\\.xlsx)")
+
+dpc_file_name
+```
+```{r}
+dpc_date <- c("診断群分類（DPC）電子点数表（正式版）（令和4年3月18日更新）",
+              "診断群分類（DPC）電子点数表（正式版）（令和4年4月19日更新）",
+              "診断群分類（DPC）電子点数 表（正式版）（令和4年5月24日更新）",
+              "診断群分類（DPC）電子点数表（正式版）（令和4年8月17日更新）",
+              "診断群分類（DPC）電子点数表（正式版）（令和4年11月15日更新）",
+              "診断群分類（DPC）電子点数表（正式版）（令和5年3月14日更新）",
+              "診断群分類（DPC）電子点数表（正式版）（令和5年5月24日更新）",
+              "診断群分類（DPC）電子点数表（正式版）（令和5年8月29日更新）",
+              "診断群分類（DPC）電子点数表（正式版）（令和5年11月21日更新）",
+              "診断群分類（DPC）電子点数表（正式版）（令和5年12月19日更新）",
+              "診断群分類（DPC）電子点数表（令和６年３月21日更新）",
+              "診断群分類（DPC）電子点数表（令和６年４月16日更新）",
+              "診断群分類（DPC）電子点数表（令和６年５月21日更新）",
+              "診断群分類（DPC）電子点数表（令和６年８月14日更新）",
+              "診断群分類（DPC）電子点数表（令和６年11月19日更新）",
+              "診断群分類（DPC）電子点数表（令和７年３月18日更新）",
+              "診断群分類（DPC）電子点数表（令和７年４月15日更新）")
+
+dpc_date <- dpc_date %>% 
+  str_extract("(?<=令和).+(?=更新)")　%>%
+  stri_trans_general("Fullwidth-Halfwidth")
+```
+
+
+```{r}
+df_file_date <- tibble(
+  FILE = dpc_file_name,
+  DATE_ori = dpc_date
+)
+
+df_file_date
+```
+
+```{r}
+df_file_date <- df_file_date %>%
+  mutate(YEAR_jp = str_extract(DATE_ori, "^[:digit:]{1}")) %>%
+  mutate(YEAR = as.numeric(YEAR_jp) + 2018) %>%
+  mutate(MONTH_jp = str_extract(DATE_ori, "(?<=年).+(?=月)"))　%>%
+  mutate(MONTH = case_when(as.numeric(MONTH_jp) <9 ~ paste0("0", MONTH_jp),
+                              .default = MONTH_jp)) %>%
+  mutate(DATE_jp = str_extract(DATE_ori, "(?<=月).+(?=日)"))　%>%
+  mutate(DATE = case_when(as.numeric(DATE_jp) <9 ~ paste0("0", DATE_jp),
+                              .default = DATE_jp)) %>%
+  mutate(DATE = paste0(YEAR, MONTH, DATE))
+
+df_file_date 
+```
+
+```{r}
+# only keep necessary columns
+
+df_file_date <- df_file_date %>%
+  select(FILE, YEAR, MONTH, DATE)
+
+df_file_date
+```
+
+```{r}
+# join 
+df_file <-df_file %>%
+  rename(YEAR_folder = "YEAR") %>%
+  left_join(df_file_date, by = join_by(FILE))
+
+df_file
+```
+
+```{r}
+df_file %>% filter(YEAR_folder != as.character(YEAR))
+```
+
+```{r}
+df_file <- df_file %>% 
+  mutate(RDS_name = paste0(DATE, "_", FILE))
+  
+```
+
+
+```{r}
+# check sheet in all files
+
+df_sheet <- map(path_dpc_list %>% unlist() %>% unique(), function(x){
+
+    sheet <- getSheetNames(x)
+  
+  df <- tibble(FILE = x %>% str_remove("\\.xlsx"),
+               SHEET = sheet)
+}) %>%
+  list_rbind()
+
+df_sheet
+```
+
+```{r}
+df_sheet %>% count(FILE)
+
+df_sheet %>% count(SHEET)
+```
+
+
+```{r}
+df_1 <- read.xlsx(df_file$PATH[1],
+                  sheet = "１）ＭＤＣ名称",
+                  startRow = 2,
+                  fillMergedCells = FALSE) 
+
+colnames(df_1) <- c("MCD_code", "MCD_name", "CHANGE", "DATE_str", "DATE_end", "DATE_update")
+
+df_1
+```
+
+
+```{r}
+df_2 <- read.xlsx(df_file$PATH[1],
+                  sheet = "２）分類名称",
+                  startRow = 2,
+                  fillMergedCells = FALSE) 
+
+colnames(df_2) <- c("MCD_code", "CLASS_name", "NAME","CHANGE", "DATE_str", "DATE_end", "DATE_update")
+
+df_2 <- df_2 %>% 
+  left_join(df_1 %>% select(MCD_code, MCD_name),
+                   by = join_by(MCD_code)) %>%
+  relocate(MCD_name, .after = "MCD_code")
+
+df_2
+```
+
+
+# create folder for each date
+
+```{r}
+df_file$DATE
+```
+```{r}
+for (i in df_file$DATE){
+  dir.create(paste0("../rds/dpc/", i),
+             showWarnings = TRUE, recursive = FALSE, mode = "0777")
+}
+```
+
+
+```{r}
+getSheetNames(df_file$PATH[1])
+```
+
+
+```{r}
+ df_6 <- read.xlsx(df_file$PATH[1],
+                  sheet = "６）手術 " ,
+                  startRow = 2,
+                  fillMergedCells = FALSE,
+                  skipEmptyCols = FALSE) 
+  
+  colnames(df_6) <- c("MCD_code", "CLASS_code", "VALUE", "SURG_flag","BW", "CODE",
+                      paste0(rep(c("SURG_name", "K_code"), 5),
+                             "_",
+                             c(rep(1, 2), rep(2, 2), rep(3, 2), rep(4, 2), rep(5, 2))),
+                      
+                      "CHANGE", "DATE_str", "DATE_end", "DATE_update")
+  
+```
+
+
+```{r}
+paste0(rep(c("SURG_name", "K_code"), 5),
+                             "_",
+                             c(rep(1, 2), rep(2, 2), rep(3, 2), rep(4, 2), rep(5, 2)))
+```
+```{r}
+c("MCD_code", "CLASS_code", "VALUE", "SURG_flag","BW", "CODE",
+                      paste0(rep(c("SURG_name", "K_code"), 5),
+                             "_",
+                             c(rep(1, 2), rep(2, 2), rep(3, 2), rep(4, 2), rep(5, 2))),
+                      
+                      "CHANGE", "DATE_str", "DATE_end", "DATE_update") %>% length()
+```
+
+
+```{r}
+
+
+    df_12 <- read.xlsx(df_file$PATH[1],
+                  sheet = "11）診断群分類点数表",
+                  startRow = 4,
+                  cols = 1:19,
+                  fillMergedCells = FALSE,
+                  skipEmptyCols = FALSE) 
+
+colnames(df_12) <- c("A", "NO", "DIAG_no",
+                     "DISEASE_name",
+                     "SURG_name",
+                     "PRO_1",
+                     "PRO_2",
+                     "DISEASE_sub",
+                     "SEVERITY",
+                     "DAY_1",
+                     "DAY_2",
+                     "DAY_3",
+                     "POINT_1",
+                     "POINT_2",
+                     "POINT_3",
+                     "CHANGE", "DATE_str", "DATE_end", "DATE_update")
+
+
+    df_12 
+```
+
+```{r}
+df_file
+```
+
+
+```{r}
+  df_7 <- read.xlsx(df_file$PATH[1],
+                  sheet = "７）手術・処置等１",
+                  startRow = 2,
+                  fillMergedCells = FALSE,
+                  skipEmptyCols = FALSE) 
+  
+  colnames(df_7) <- c("MDC_code", "CLASS_code",  "CODE", "PRO1_flag", "COND",
+                      paste0(rep(c("SURG_name", "K_code"), 2),
+                             "_",
+                             c(rep(1, 2), rep(2, 2))),
+                      
+                      "CHANGE", "DATE_str", "DATE_end", "DATE_update")
+  
+  
+  df_8 <- read.xlsx(df_file$PATH[1],
+                  sheet = "８）手術・処置等２",
+                  startRow = 2,
+                  fillMergedCells = FALSE,
+                  skipEmptyCols = FALSE) 
+  
+  colnames(df_8) <- c("MDC_code", "CLASS_code",  "CODE", "PRO2_flag",
+                      paste0(rep(c("SURG_name", "K_code"), 2),
+                             "_",
+                             c(rep(1, 2), rep(2, 2))),
+                      
+                      "CHANGE", "DATE_str", "DATE_end", "DATE_update")
+```
+
+
+```{r}
+    df_11 <- read.xlsx(df_file$PATH[1],
+                  sheet = "11）診断群分類点数表",
+                  startRow = 4,
+                  fillMergedCells = FALSE,
+                  skipEmptyCols = FALSE) 
+      
+      colnames(df_11) <- c("A",
+                           "NO", "DIAG_no",
+                     "DISEASE_name",
+                     "SURG_name",
+                     "PRO_1",
+                     "PRO_2",
+                     "DISEASE_sub",
+                     "SEVERITY",
+                     "DAY_1",
+                     "DAY_2",
+                     "DAY_3",
+                     "POINT_1",
+                     "POINT_2",
+                     "POINT_3",
+                     "CHANGE", "DATE_str", "DATE_end", "DATE_update")
+```
+
+
+```{r}
+# parse 1) MDC name
+
+parse_dpc <- function(file_path, file_date){
+  
+  file_name <- file_path %>% str_extract("(?<=\\/)00[:digit:]+(?=\\.xlsx)")
+
+  file_year <- file_path %>% str_extract("(?<=dpc\\/)[:digit:]{4}(?=\\/)")
+  
+  add_info <- function(x){
+    x %>%
+      mutate(FILE = file_name,
+           YEAR = file_year,
+           DATE = file_date) %>%
+      return()
+  }
+  
+  df_1 <- read.xlsx(file_path,
+                  sheet = "１）ＭＤＣ名称",
+                  startRow = 2,
+                  fillMergedCells = FALSE) 
+  
+  colnames(df_1) <- c("MCD_code", "MCD_name", "CHANGE", "DATE_str", "DATE_end", "DATE_update")
+  
+  df_2 <- read.xlsx(file_path,
+                  sheet = "２）分類名称",
+                  startRow = 2,
+                  fillMergedCells = FALSE)
+  
+  colnames(df_2) <- c("MCD_code", "CLASS_code", "CLASS_name","CHANGE", "DATE_str", "DATE_end", "DATE_update")
+  
+  
+  df_4 <- read.xlsx(file_path,
+                  sheet = "４）ＩＣＤ",
+                  startRow = 2,
+                  fillMergedCells = FALSE)
+  
+  colnames(df_4) <- c("MDC_code", "CLASS_code", "ICD_name", "ICD_code",
+                      "CHANGE", "DATE_str", "DATE_end", "DATE_update")
+  
+  
+  df_6 <- read.xlsx(file_path,
+                  sheet = "６）手術 ",
+                  startRow = 2,
+                  fillMergedCells = FALSE,
+                  skipEmptyCols = FALSE) 
+  
+  colnames(df_6) <- c("MDC_code", "CLASS_code", "VALUE", "SURG_flag","BW", "CODE",
+                      paste0(rep(c("SURG_name", "K_code"), 5),
+                             "_",
+                             c(rep(1, 2), rep(2, 2), rep(3, 2), rep(4, 2), rep(5, 2))),
+                      
+                      "CHANGE", "DATE_str", "DATE_end", "DATE_update")
+  
+  
+  df_7 <- read.xlsx(file_path,
+                  sheet = "７）手術・処置等１",
+                  startRow = 2,
+                  fillMergedCells = FALSE,
+                  skipEmptyCols = FALSE) 
+  
+  colnames(df_7) <- c("MDC_code", "CLASS_code",  "CODE", "PRO1_flag", "COND",
+                      paste0(rep(c("SURG_name", "K_code"), 2),
+                             "_",
+                             c(rep(1, 2), rep(2, 2))),
+                      
+                      "CHANGE", "DATE_str", "DATE_end", "DATE_update")
+  
+  
+  df_8 <- read.xlsx(file_path,
+                  sheet = "８）手術・処置等２",
+                  startRow = 2,
+                  fillMergedCells = FALSE,
+                  skipEmptyCols = FALSE) 
+  
+  colnames(df_8) <- c("MDC_code", "CLASS_code",  "CODE", "PRO2_flag",
+                      paste0(rep(c("SURG_name", "K_code"), 2),
+                             "_",
+                             c(rep(1, 2), rep(2, 2))),
+                      
+                      "CHANGE", "DATE_str", "DATE_end", "DATE_update")
+  
+  
+    df_11 <- read.xlsx(file_path,
+                  sheet = "11）診断群分類点数表",
+                  startRow = 4,
+                  fillMergedCells = FALSE,
+                  skipEmptyCols = FALSE) 
+      
+      colnames(df_11) <- c("A",
+                           "NO", "DIAG_no",
+                     "DISEASE_name",
+                     "SURG_name",
+                     "PRO_1",
+                     "PRO_2",
+                     "DISEASE_sub",
+                     "SEVERITY",
+                     "DAY_1",
+                     "DAY_2",
+                     "DAY_3",
+                     "POINT_1",
+                     "POINT_2",
+                     "POINT_3",
+                     "CHANGE", "DATE_str", "DATE_end", "DATE_update")
+      
+      df_11 <- df_11 %>% select(!A)
+      
+      # save 1 2 4 6 7 8 11
+      
+      saveRDS(df_1 %>% add_info(), 
+              paste0("../rds/dpc/", file_date, "/", "df_dpc_1_", file_date, ".RDS"))
+      
+      saveRDS(df_2 %>% add_info(), 
+              paste0("../rds/dpc/", file_date, "/", "df_dpc_2_", file_date, ".RDS"))
+      
+      saveRDS(df_4 %>% add_info(), 
+              paste0("../rds/dpc/", file_date, "/", "df_dpc_4_", file_date, ".RDS"))
+      
+      saveRDS(df_6 %>% add_info(), 
+              paste0("../rds/dpc/", file_date, "/", "df_dpc_6_", file_date, ".RDS"))
+      
+      saveRDS(df_7 %>% add_info(), 
+              paste0("../rds/dpc/", file_date, "/", "df_dpc_7_", file_date, ".RDS"))
+      
+      saveRDS(df_8 %>% add_info(), 
+              paste0("../rds/dpc/", file_date, "/", "df_dpc_8_", file_date, ".RDS"))
+      
+      saveRDS(df_11 %>% add_info(), 
+              paste0("../rds/dpc/", file_date, "/", "df_dpc_11_", file_date, ".RDS"))
+}
+  
+```
+
+
+```{r}
+for (i in 1:length(df_file$PATH)){
+  parse_dpc(df_file$PATH[i],
+            df_file$DATE[i])
+}
+
+```
