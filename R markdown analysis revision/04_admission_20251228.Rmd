@@ -1,0 +1,763 @@
+---
+title: "HBV"
+output: html_document
+date: "2025-12-28"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(readxl)
+library(openxlsx)
+
+library(cowplot)
+library(patchwork)
+library(scales)
+```
+
+
+```{r}
+list.files("../rds/dpc")
+```
+
+```{r}
+# read RDS
+
+rds_name <- list.files("../rds/dpc/20230829") %>% str_subset("RDS") %>% str_remove("\\.RDS")
+
+rds_name
+```
+
+```{r}
+rds_path <- paste0("../rds/dpc/20230829/", rds_name, ".RDS")
+```
+
+```{r}
+for (i in 1:length(rds_name)){
+  assign(rds_name[i] %>% str_remove("_[:digit:]+$")　, readRDS(rds_path[i]))
+}
+```
+
+# read BOJ
+
+```{r}
+df_boj <- readRDS("../rds/boj/df_boj.RDS")
+```
+
+# read surgery
+
+```{r}
+df_combine_reg <- readRDS("../rds/df_combine_reg.RDS")
+```
+
+
+```{r}
+df_hcc <- readRDS("../df/analysis/df_hcc.RDS")
+```
+
+# format numeriac
+
+```{r}
+df_combine_reg <- df_combine_reg %>%
+  mutate(across(c(POINT, TOTAL), ~ as.numeric(.x))) %>%
+    mutate(across(c(starts_with("DAY_"),starts_with("POINT_")),
+                ~ replace_na(.x, 0))) 
+```
+
+
+```{r}
+df_dpc_11 <- df_dpc_11 %>%
+  mutate(across(c(starts_with("DAY_"),starts_with("POINT_")),
+                ~ as.numeric(.x))) %>%
+  mutate(across(c(starts_with("DAY_"),starts_with("POINT_")),
+                ~ replace_na(.x, 0))) 
+```
+
+
+```{r}
+# add 
+
+df_dpc_11 <- df_dpc_11 %>%
+  mutate(DPC_1 = (DAY_1 * POINT_1) * 10,
+         DPC_2 = (DAY_1 * POINT_1 + DAY_2 * POINT_2) * 10)
+```
+
+
+```{r}
+df_dpc_6 %>%
+  filter(str_detect(SURG_name_1, "ラジオ波|マイクロ波")) %>% View()
+```
+
+
+
+# (percuatneous) ablation
+
+```{r}
+df_dpc_11 %>%
+  filter(str_detect(SURG_name, "ラジオ波|マイクロ") &
+           PRO_1 == "なし" &
+           !str_detect(SURG_name, "腹腔鏡")) %>% View()
+```
+
+
+```{r}
+df_dpc_abl <- df_dpc_11 %>%
+  filter(str_detect(SURG_name, "ラジオ波|マイクロ") &
+           PRO_1 == "なし" &
+           !str_detect(SURG_name, "腹腔鏡")) %>%
+  mutate(PRO_en = "Ablation") %>%
+  mutate(PRO_dpc = PRO_en)
+
+df_dpc_abl
+```
+
+```{r}
+ df_hcc %>%
+  filter(str_detect(PRO_name, "ラジオ波|マイクロ波")) %>% View()
+```
+
+
+```{r}
+df_hcc_abl <- df_hcc %>%
+  filter(str_detect(PRO_name, "ラジオ波|マイクロ波") & !str_detect(PRO_name, "腹腔鏡")) %>%
+  mutate(PRO_dpc = PRO_en)
+
+df_hcc_abl 
+```
+
+```{r}
+colnames(df_dpc_abl)
+colnames(df_hcc_abl)
+```
+
+```{r}
+intersect(colnames(df_dpc_abl), colnames(df_hcc_abl))
+```
+
+
+```{r}
+df_hcc_abl <- df_hcc_abl %>%
+  left_join(df_dpc_abl %>% 
+              select(!PRO_en) %>%
+              rename(FILE_dpc = "FILE"),
+            by = join_by(PRO_dpc))
+
+df_hcc_abl
+```
+
+```{r}
+#df_hcc_abl <- df_hcc_abl %>%
+#  mutate(TOTAL_min = COST_yen + DPC_1 ,
+#         TOTAL_max = COST_yen + DPC_2)
+```
+
+# hepatectomy
+
+```{r}
+df_dpc_res <- df_dpc_11 %>%
+  filter(str_detect(SURG_name, "肝切除術") & str_detect(DISEASE_name, "肝・肝内胆管の悪性腫瘍")) %>%
+  mutate(PRO_en = "Resection") %>%
+  mutate(PRO_dpc = case_when(str_detect(SURG_name, "血行") ~ "Resection_2",
+                              .default = PRO_en))
+  
+  
+df_dpc_res
+```
+
+```{r}
+df_hcc_res <- df_hcc %>%
+  filter(str_detect(PRO_name, "肝切除術") ) %>%
+  mutate(PRO_dpc = case_when(str_detect(PRO_name, "血行|３区域切除") ~ "Resection_2",
+                              .default = "Resection"))
+```
+
+```{r}
+df_hcc_res %>% count(PRO_name, PRO_en)
+```
+
+
+```{r}
+df_hcc_res <- df_hcc_res %>%
+  left_join(df_dpc_res  %>% 
+              select(!PRO_en) %>%
+              rename(FILE_dpc = "FILE"),
+            by = join_by(PRO_dpc))
+
+df_hcc_res
+```
+
+```{r}
+df_hcc_res %>%
+  slice_max(TOTAL, n = 1)
+
+# 腹腔鏡下肝切除術（部分切除）（単回
+```
+
+
+# TACE
+
+```{r}
+ df_dpc_11 %>%
+  filter(str_detect(SURG_name, "塞栓"))  %>% View()
+```
+
+```{r}
+df_dpc_11 %>%
+   filter(str_detect(SURG_name, "その他の手術あり") & str_detect(DISEASE_name, "肝・肝内胆管の悪性腫瘍")) %>%View()
+
+# use 060050xx97x0xx
+```
+
+
+```{r}
+df_dpc_tace <- df_dpc_11 %>%
+   filter(DIAG_no == "060050xx97x0xx") %>%
+  mutate(PRO_en = "TACE") %>%
+  mutate(PRO_dpc = PRO_en)
+
+df_dpc_tace
+```
+
+
+```{r}
+df_hcc_tace <- df_hcc %>%
+  filter(PRO_en == "TACE")%>%
+  mutate(PRO_dpc = PRO_en)
+
+df_hcc_tace
+```
+
+
+
+```{r}
+df_hcc_res %>% count(PRO_name, PRO_dpc)
+```
+
+
+```{r}
+df_hcc_tace <- df_hcc_tace %>%
+  left_join(df_dpc_tace %>%
+               select(!PRO_en) %>%
+              rename(FILE_dpc = "FILE"),
+            by = join_by(PRO_dpc))
+
+df_hcc_tace
+```
+
+```{r}
+df_hcc_dpc <- df_hcc_abl %>%
+  bind_rows(df_hcc_res) %>%
+  bind_rows(df_hcc_tace)
+```
+
+```{r}
+df_hcc_dpc
+```
+
+
+
+# prepare anesthesia
+
+```{r}
+df_hcc_res %>% count(CLASS_name)
+```
+
+```{r}
+df_hcc_dpc <- df_hcc_dpc %>%
+  mutate(PRO_anes = case_when( CLASS_name == "肝切除術" ~ "open",
+                              CLASS_name == "腹腔鏡下肝切除術" ~ "lap",
+                              .default = NA))
+
+df_hcc_dpc 
+```
+
+
+```{r}
+# need anesthesia
+
+df_combine_reg %>% filter(str_detect(PRO_name, "全身麻酔") & 
+                            SHEET == "in")　%>% View()
+
+#マスク又は気管内挿管による閉鎖循環式全身麻酔４（腹腔鏡使用手術・検査又は側臥位）（イ以外の場合）
+#麻酔管理料１（マスク又は気管内挿管による閉鎖循環式全身麻酔を行った場合）
+
+```
+
+```{r}
+df_anes_open <- df_combine_reg %>% filter(PRO_name %in% c("マスク又は気管内挿管による閉鎖循環式全身麻酔５（その他）（イ以外の場合）",                                "麻酔管理料１（マスク又は気管内挿管による閉鎖循環式全身麻酔を行った場合）") & 
+                            SHEET == "in")
+
+df_anes_open
+```
+
+
+```{r}
+df_anes_open <- df_anes_open %>% mutate(PRO_anes = "open") %>%
+  select(PRO_anes, POINT) %>%
+  group_by(PRO_anes) %>%
+  summarise(POINT_anes = sum(POINT)) 
+
+df_anes_open 
+```
+
+```{r}
+df_anes_lap <- df_combine_reg %>% filter(PRO_name %in% c("マスク又は気管内挿管による閉鎖循環式全身麻酔４（腹腔鏡使用手術・検査又は側臥位）（イ以外の場合）",                                "麻酔管理料１（マスク又は気管内挿管による閉鎖循環式全身麻酔を行った場合）") & 
+                            SHEET == "in")
+
+df_anes_lap
+```
+
+
+
+```{r}
+df_anes_lap <- df_anes_lap %>% mutate(PRO_anes = "lap") %>%
+  select(PRO_anes, POINT) %>%
+  group_by(PRO_anes) %>%
+  summarise(POINT_anes = sum(POINT)) 
+
+df_anes_lap 
+```
+
+
+# join anesthesia to dpc
+
+```{r}
+df_hcc_dpc <- df_hcc_dpc %>%
+  mutate(POINT_anes = 0) %>%
+  rows_update(df_anes_open, by = "PRO_anes") %>%
+  rows_update(df_anes_lap, by = "PRO_anes")
+
+df_hcc_dpc 
+```
+
+
+```{r}
+df_hcc_dpc %>% View()
+```
+
+
+```{r}
+df_hcc_dpc <- df_hcc_dpc %>% 
+  mutate(PRO_en = factor(PRO_en, levels = c("Ablation", "TACE", "Resection")))
+```
+
+
+```{r}
+df_hcc_dpc <- df_hcc_dpc %>%
+  mutate(POINT_dpc = POINT_1 * DAY_1 + POINT_2 *(DAY_2-DAY_1)) %>%
+  mutate(POINT_all = POINT + POINT_dpc + POINT_anes)
+```
+
+```{r}
+df_hcc_stack <- df_hcc_dpc %>% select(PRO_en, POINT, TOTAL, POINT_dpc, POINT_anes)
+
+df_hcc_stack  <- df_hcc_stack %>%
+  group_by(PRO_en) %>%
+  mutate(TOTAL_sum = sum(TOTAL)) %>%
+  summarise(POINT = sum(POINT * TOTAL/TOTAL_sum),
+            POINT_dpc = sum(POINT_dpc * TOTAL/TOTAL_sum),
+            POINT_anes = sum(POINT_anes * TOTAL/TOTAL_sum))
+```
+
+
+```{r}
+df_hcc_stack <- df_hcc_stack %>% pivot_longer(cols = starts_with("POINT"),
+                              names_to = "CAT", values_to = "POINT") %>%
+  mutate(CAT = case_when(str_detect(CAT, "dpc") ~ "Admission",
+                         str_detect(CAT, "anes") ~ "Anesthesia",
+                         .default = "Treatment")) %>%
+  mutate(COST_jp = POINT *10) %>%
+  mutate(COST_usd = COST_jp/140.62) %>%
+  mutate(CAT = factor(CAT, levels = c("Anesthesia",
+                                      "Treatment",
+                                      "Admission")))
+```
+
+
+```{r}
+df_hcc_stack
+```
+
+
+```{r}
+ df_hcc_stack %>%
+  group_by(PRO_en) %>%
+  summarise(SUM = sum(COST_jp)) 
+```
+
+
+```{r}
+label_hcc_total <- df_hcc_stack %>%
+  group_by(PRO_en) %>%
+  summarise(SUM = sum(COST_usd)) %>%
+  mutate(label = round(SUM)) %>%
+  mutate(label = scales::comma(label))
+
+label_hcc_total 
+```
+
+
+```{r}
+p1_d1 <- df_hcc_stack %>%
+  filter(COST_usd != 0) %>%
+  ggplot(aes(COST_usd, PRO_en, fill = CAT))+
+  geom_col(width = 0.5, position = "stack")+
+    scale_fill_manual(values = c("#bcbd22", 
+                                  "#e377c2","#17becf"),
+                    name = "Cost",
+                    breaks = c("Admission",
+                               "Treatment",
+                               "Anesthesia"))+
+  
+  geom_text(aes(label = round(COST_usd) %>% scales::comma()),
+            size = 2.8, position = position_stack(vjust = 0.5))+
+  
+  geom_text(data = label_hcc_total,
+            aes(x = SUM + 10000/25, y = PRO_en, label = label),
+            hjust = 0, vjust = 0.5, size = 2.8, colour = "black",
+            fontface = "bold",
+            inherit.aes = FALSE) +
+    coord_cartesian(clip = "off")+
+  scale_x_continuous(expand = c(0, 0),
+                     limits = c(0, 10000),
+                     breaks = seq(0, 10000, 2000),
+                     labels= label_comma())+
+  guides(fill = guide_legend(override.aes = list(colour = "black",
+                                                 linewidth = 0.2)))+
+  labs(tag = "d",
+       x = "Original cost (USD)",
+       y = "Treatment")+
+  theme_classic()+
+    theme(plot.tag = element_text(size = 12, colour = "black", face = "bold"),
+          axis.title = element_text(size = 8, colour = "black", face = "bold"),
+        axis.text.x = element_text(size = 8, colour = "black"),
+        axis.text.y = element_text(size = 8, colour = "black"),
+        axis.line = element_line(linewidth = 0.3, colour = "black"),
+        axis.ticks = element_line(linewidth = 0.3, colour = "black"),
+         legend.title = element_blank(),
+          #element_text(size = 8, colour = "black", face = "bold"),
+        legend.text = element_text(size = 8, colour = "black"),
+        legend.position = "inside",
+        legend.position.inside = c(1, 0),
+        legend.justification.inside = c(1, 0),
+        legend.background = element_blank(),
+        legend.box.background = element_blank(),
+   #     legend.margin = margin(0, 0, 0, 0),
+      legend.spacing.x = unit(0, "mm"),
+      legend.spacing.y = unit(0, "mm"),
+      legend.key.spacing.x = unit(0, "mm"),
+        legend.key.spacing.y =  unit(0, "mm"),
+      legend.key = element_rect(fill = NA),
+      legend.key.size = unit(4, "mm"),
+        plot.margin = margin(0, 7.5 , 0, 0, "mm"))
+
+p1_d1
+```
+
+
+```{r}
+df_hcc_dpc_wt <- df_hcc_dpc %>%
+  group_by(PRO_en) %>%
+  mutate(TOTAL_sum = sum(TOTAL)) %>%
+  summarise(POINT = sum(POINT_all * TOTAL/TOTAL_sum)) %>%
+  mutate(COST_jp = POINT * 10) %>%
+  mutate(COST_usd = COST_jp/140.62) %>%
+  mutate(AFF = COST_jp*100/(1004*40*52))
+
+df_hcc_dpc_wt
+```
+
+```{r}
+df_hcc_upl <- df_hcc_dpc_wt %>%
+  mutate(UPL_1 = 252600 + (COST_jp - 842000) *1/100) %>%
+  mutate(UPL_2 = 167400 + (COST_jp - 558000) *1/100) %>%
+  mutate(UPL_3 = 80100 + (COST_jp - 267000) *1/100) %>%
+  mutate(UPL_4 = 57600) %>%
+  mutate(UPL_5 = 35400) %>%
+  mutate(UPL_6 = 24600) %>%
+  mutate(UPL_7 = 15000)
+
+df_hcc_upl
+```
+
+```{r}
+df_hcc_upl <- df_hcc_upl %>%
+  mutate(AFF_1 = UPL_1 *100/(1004*40*52)) %>%
+  mutate(AFF_2 = UPL_2 *100/(1004*40*52)) %>%
+  mutate(AFF_3 = UPL_3 *100/(1004*40*52)) %>%
+  mutate(AFF_4 = UPL_4 *100/(1004*40*52)) %>%
+  mutate(AFF_5 = UPL_5 *100/(1004*40*52)) %>%
+  mutate(AFF_6 = UPL_6 *100/(1004*40*52)) %>%
+  mutate(AFF_7 = UPL_7 *100/(1004*40*52))
+
+df_hcc_upl 
+```
+
+
+```{r}
+df_hcc_upl_long <- df_hcc_upl %>%
+  pivot_longer(cols = c(starts_with("AFF")),
+               names_to = "AFF_cat",
+               values_to = "AFF")
+
+df_hcc_upl_long
+```
+
+
+```{r}
+df_hcc_upl_med <- df_hcc_upl_long %>%
+  filter(AFF_cat != "AFF") %>%
+  group_by(PRO_en) %>%
+  summarise(AFF = median(AFF)) %>% 
+  mutate(AFF_cat = "AFF_med")
+
+df_hcc_upl_med
+```
+
+```{r}
+df_hcc_upl_med <- df_hcc_upl_med %>%
+  mutate(label = round(AFF, digits = 2) %>% format(nsmall = 2)) %>%
+  arrange(desc(PRO_en)) %>%
+  mutate(x = AFF) %>%
+  bind_cols(tibble(y = c(3:1) + 0.3)) %>%
+  mutate(hjust = 0.5)
+
+df_hcc_upl_med 
+```
+
+
+```{r}
+df_hcc_upl_plot <- df_hcc_upl_long %>%
+  select(any_of(colnames(df_hcc_upl_med))) %>%
+  bind_rows(df_hcc_upl_med)
+
+df_hcc_upl_plot
+```
+
+
+```{r}
+label_aff <- df_hcc_upl %>%
+  mutate(label_1 = formatC(AFF, digits = 3, format = "g", flag = "#") %>%
+           str_remove_all(".\\s") %>%
+           str_replace("\\.$", "\\.0")) 
+
+label_aff
+```
+
+
+
+```{r}
+label_aff <- label_aff %>%
+  mutate(label_2 = paste0("(", formatC(AFF_7, format = "g", digits = 2),
+                        " - ",
+                        formatC(AFF_1, format = "g", digits = 3), ")"))
+```
+
+```{r}
+label_aff <- label_aff %>%  
+  arrange(desc(PRO_en)) %>%
+  mutate(x1 = AFF) %>%
+  bind_cols(tibble(y1 = c(3:1) + 0.3)) %>%
+  mutate(hjust1 = case_when(PRO_en == "Resection" ~ 0.5,
+                            .default= 0.5)) %>%
+  bind_cols(tibble(y2 = c(3:1) - 0.3)) %>%
+  mutate(x2 = (AFF_1 + AFF_7)/2) %>%
+  mutate(hjust2 = 0.5)
+```
+
+
+```{r}
+# 
+
+p1_d_plot <- df_hcc_upl  %>%
+   ggplot()+
+    geom_segment(aes(x = AFF_1, xend = AFF_7,
+                   y = PRO_en, yend = PRO_en),
+                 linewidth = 0.3) +
+  geom_point(data = df_hcc_upl_plot    %>% filter(AFF_cat %in% c("AFF", "AFF_med")),
+             aes(x = AFF, y = PRO_en, colour = AFF_cat),
+             size = 1,
+             inherit.aes = FALSE)+
+  scale_colour_manual(values = c("black", "#d62728"),
+                    name = "Cost",
+                    labels = c("Original",
+                               "Insurance coverage\n(price capping)"))+
+    geom_text(data = label_aff,
+            aes(x = x1, y = y1, label = label_1, hjust = hjust1),
+             vjust = 0.5, size = 2.8, colour = "black",
+            inherit.aes = FALSE)+
+  geom_text(data = label_aff,
+            aes(x = x2, y = y2, label = label_2, hjust = hjust2),
+             vjust = 0.5, size = 2.8, colour = "black",
+            inherit.aes = FALSE)+
+  geom_text(data = df_hcc_upl_med,
+            aes(x = x, y = y, label = label, hjust = hjust),
+             vjust = 0.5, size = 2.8, colour = "black",
+            inherit.aes = FALSE)+
+  scale_x_continuous(breaks = seq(0,60, 15),
+                     limits = c(0, 60))+
+  coord_cartesian(clip = "off")+
+  labs(
+       x = "Affordability (%)",
+       y = "Treatment")+
+  guides(colour = guide_legend(override.aes = list(size = 2.6,
+                                                   fill=NA)))+
+  theme_classic()+
+  theme(plot.title = element_text(size = 12, colour = "black", face = "bold"),
+        axis.title.x = element_text(size = 8, colour = "black", face = "bold"),
+        axis.title.y = element_blank(),
+        axis.text.x = element_text(size = 8, colour = "black"),
+        axis.text.y = element_blank(),
+        axis.line = element_line(linewidth = 0.3, colour = "black"),
+        axis.ticks = element_line(linewidth = 0.3, colour = "black"),
+        legend.title = element_blank(),
+          #element_text(size = 8, colour = "black", face = "bold"),
+        legend.text = element_text(size = 8, colour = "black"),
+        legend.position = "right",
+        legend.background = element_blank(),
+     #   legend.margin = margin(0, 0, 0, 0),
+      legend.spacing.x = unit(0, "mm"),
+      legend.spacing.y = unit(0, "mm"),
+      legend.key.spacing.x = unit(0, "mm"),
+        legend.key.spacing.y =  unit(0, "mm"),
+      legend.key = element_rect(fill = NA),
+        plot.margin = margin(0, 0 , 0, 0, "mm"))
+
+```
+
+
+```{r}
+p1_d_leg <- p1_d_plot %>% get_legend()
+
+p1_d_leg <- wrap_plots(p1_d_leg)
+
+p1_d_leg
+```
+
+
+
+```{r}
+# affordability
+
+p1_d2 <- df_hcc_upl  %>%
+   ggplot()+
+  geom_point(data = df_hcc_upl_plot %>% filter(AFF_cat %in% c("AFF")),
+             aes(x = AFF, y = PRO_en, colour = AFF_cat),
+             size = 1,
+             inherit.aes = FALSE)+
+  scale_colour_manual(values = c("black"),
+                    name = "Cost",
+                    labels = c("Original"))+
+    geom_text(data = label_aff,
+            aes(x = x1, y = y1, label = label_1, hjust = hjust1),
+             vjust = 0.5, size = 2.8, colour = "black",
+            inherit.aes = FALSE)+
+  scale_x_continuous(breaks = seq(0,60, 15),
+                     limits = c(0, 60))+
+  coord_cartesian(clip = "off")+
+  labs(title = "Original cost",
+       x = "Affordability (%)",
+       y = "Treatment")+
+  guides(colour = guide_legend(override.aes = list(size = 2.6,
+                                                   fill=NA)))+
+  theme_classic()+
+  theme(plot.title = element_text(size = 8, colour = "black", face = "bold", hjust = 0.5),
+        axis.title.x = element_text(size = 8, colour = "black", face = "bold"),
+        axis.title.y = element_blank(),
+        axis.text.x = element_text(size = 8, colour = "black"),
+        axis.text.y = element_blank(),
+        axis.line = element_line(linewidth = 0.3, colour = "black"),
+        axis.ticks = element_line(linewidth = 0.3, colour = "black"),
+        legend.title = element_blank(),
+          #element_text(size = 8, colour = "black", face = "bold"),
+        legend.text = element_text(size = 8, colour = "black"),
+        legend.position = "none",
+        legend.position.inside = c(0.55, 0),
+        legend.justification.inside = c(0, 0),
+        legend.background = element_blank(),
+        legend.box.background = element_blank(),
+     #   legend.margin = margin(0, 0, 0, 0),
+      legend.spacing.x = unit(0, "mm"),
+      legend.spacing.y = unit(0, "mm"),
+      legend.key.spacing.x = unit(0, "mm"),
+        legend.key.spacing.y =  unit(0, "mm"),
+      legend.key = element_rect(fill = NA),
+        plot.margin = margin(0, 5 , 0, 0, "mm"))
+
+p1_d2 
+```
+
+```{r}
+# affordability
+
+p1_d3 <- df_hcc_upl  %>%
+   ggplot()+
+    geom_segment(aes(x = AFF_1, xend = AFF_7,
+                   y = PRO_en, yend = PRO_en),
+                 linewidth = 0.3) +
+  geom_point(data = df_hcc_upl_plot    %>% filter(AFF_cat %in% c( "AFF_med")),
+             aes(x = AFF, y = PRO_en, colour = AFF_cat),
+             size = 1,
+             inherit.aes = FALSE)+
+  scale_colour_manual(values = c("#d62728"),
+                    name = "Cost",
+                    labels = c(
+                               "Out-of-pocket"))+
+ #   geom_text(data = label_aff,
+#            aes(x = x1, y = y1, label = label_1, hjust = hjust1),
+#             vjust = 0.5, size = 2.8, colour = "black",
+#            inherit.aes = FALSE)+
+  geom_text(data = label_aff,
+            aes(x = x2, y = y2, label = label_2, hjust = hjust2),
+             vjust = 0.5, size = 2.8, colour = "black",
+            inherit.aes = FALSE)+
+  geom_text(data = df_hcc_upl_med,
+            aes(x = x, y = y, label = label, hjust = hjust),
+             vjust = 0.5, size = 2.8, colour = "black",
+            inherit.aes = FALSE)+
+  scale_x_continuous(breaks = seq(0,15, 5),
+                     limits = c(0, 15))+
+  coord_cartesian(clip = "off")+
+  labs(title = "Insurance coverage\n(price capping)",
+       x = "Affordability (%)",
+       y = "Treatment")+
+  guides(colour = guide_legend(override.aes = list(size = 2.6,
+                                                   fill=NA)))+
+  theme_classic()+
+  theme(plot.title = element_text(size = 8, colour = "black", face = "bold", hjust = 0.5),
+        axis.title.x = element_text(size = 8, colour = "black", face = "bold"),
+        axis.title.y = element_blank(),
+        axis.text.x = element_text(size = 8, colour = "black"),
+        axis.text.y = element_blank(),
+        axis.line = element_line(linewidth = 0.3, colour = "black"),
+        axis.ticks = element_line(linewidth = 0.3, colour = "black"),
+        legend.title = element_blank(),
+          #element_text(size = 8, colour = "black", face = "bold"),
+        legend.text = element_text(size = 8, colour = "black"),
+        legend.position = "none",
+        legend.position.inside = c(0.55, 0),
+        legend.justification.inside = c(0, 0),
+        legend.background = element_blank(),
+        legend.box.background = element_blank(),
+     #   legend.margin = margin(0, 0, 0, 0),
+      legend.spacing.x = unit(0, "mm"),
+      legend.spacing.y = unit(0, "mm"),
+      legend.key.spacing.x = unit(0, "mm"),
+        legend.key.spacing.y =  unit(0, "mm"),
+      legend.key = element_rect(fill = NA),
+        plot.margin = margin(0, 5 , 0, 0, "mm"))
+
+p1_d3 
+```
+
+```{r}
+saveRDS(p1_d1, "../plot/p1_d1.RDS")
+saveRDS(p1_d2, "../plot/p1_d2.RDS")
+saveRDS(p1_d3, "../plot/p1_d3.RDS")
+
+saveRDS(p1_d_leg, "../plot/p1_d_leg.RDS")
+```
+

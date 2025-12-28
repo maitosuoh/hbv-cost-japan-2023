@@ -1,0 +1,325 @@
+---
+title: "HBV"
+output: html_document
+date: "2025-12-28"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(readxl)
+library(openxlsx)
+
+library(ggtext)
+library(patchwork)
+library(scales)
+```
+
+
+```{r}
+list.files("../rds")
+```
+
+```{r}
+# read RDS
+
+rds_name <- list.files("../rds") %>% str_subset("RDS") %>% str_remove("\\.RDS")
+
+rds_name
+```
+
+```{r}
+rds_path <- paste0("../rds/", rds_name, ".RDS")
+```
+
+```{r}
+for (i in 1:length(rds_name)){
+  assign(rds_name[i]　, readRDS(rds_path[i]))
+}
+```
+
+# read df_oral_nuc
+
+```{r}
+df_oral_nuc <- readRDS("../df/analysis/df_oral_nuc.RDS")
+```
+
+# read plot
+
+
+```{r}
+df_surg_dem_reg %>%
+  filter(str_detect(PRO_name, "ラジオ波|マイクロ波") & str_detect(PRO_name, "肝悪性腫瘍")) %>% View()
+```
+
+```{r}
+df_surg_dem_reg %>%
+  filter(str_detect(PRO_name, "肝切除術")) %>% View()
+```
+
+```{r}
+df_surg_dem_reg %>%
+  filter(str_detect(PRO_name, "化学塞栓")) %>% View()
+```
+
+
+```{r}
+df_surg_dem_reg %>%
+  filter(str_detect(PRO_name, "ラジオ波|マイクロ波") & str_detect(PRO_name, "肝悪性腫瘍")) %>%
+  filter(SHEET == "in")
+```
+
+```{r}
+df_surg_dem_reg <- df_surg_dem_reg %>%
+  mutate(across(c(POINT, TOTAL), ~ str_replace(.x, "-", "0"))) %>%
+  mutate(across(c(POINT, TOTAL), ~ as.numeric(.x)))
+```
+
+
+```{r}
+df_abl <- df_surg_dem_reg %>%
+  filter(str_detect(PRO_name, "ラジオ波|マイクロ波") &
+           str_detect(PRO_name, "肝悪性腫瘍") &
+           !str_detect(PRO_name, "腹腔鏡")) %>%
+  mutate(PRO_en = "Ablation")
+
+df_hptx <- df_surg_dem_reg %>%
+  filter(str_detect(PRO_name, "肝切除術")) %>%
+  mutate(PRO_en = "Resection")
+
+df_tace <- df_surg_dem_reg %>%
+  filter(str_detect(PRO_name, "血管塞栓術") & str_detect(PRO_name, "選択的")) %>%
+  mutate(PRO_en = "TACE")
+
+df_lt <- df_surg_dem_reg %>%
+  filter(str_detect(PRO_name, "肝移植")) %>%
+  mutate(PRO_en = "Liver\ntransplantation") %>%
+  mutate(PRO_lt = case_when(str_detect(CLASS_name, "生体") ~ "living",
+                            str_detect(CLASS_name, "死体") ~ "deceased"))
+
+df_donor <- df_surg_dem_reg %>%
+  filter(str_detect(PRO_name, "移植用部分肝採取術|移植用肝採取術")) %>%
+  mutate(PRO_en = "Donor") %>%
+  mutate(PRO_lt = case_when(str_detect(CLASS_name, "生体") ~ "living",
+                            str_detect(CLASS_name, "死体") ~ "deceased"))
+```
+
+```{r}
+df_surg_dem_reg %>%
+  filter(str_detect(PRO_name, "肝移植"))
+```
+
+```{r}
+df_surg_dem_reg %>%
+  filter(str_detect(PRO_name, "移植用部分肝採取術|移植用肝採取術"))
+```
+
+```{r}
+df_donor <- df_donor %>% filter(!is.na(TOTAL))
+
+df_donor
+```
+
+```{r}
+# laparoscopic graft -> 0
+
+df_donor <- df_donor %>%
+  filter(TOTAL != 0)
+```
+
+
+
+```{r}
+df_hcc <- df_abl %>%
+  bind_rows(df_hptx) %>%
+  bind_rows(df_tace) %>%
+  bind_rows(df_lt) %>%
+  filter(SHEET == "in")
+
+df_hcc
+```
+
+
+```{r}
+#df_hcc <- df_hcc %>%
+#  left_join(df_donor %>% select(CLASS_name, TOTAL, POINT, PRO_lt),
+#            by = join_by(PRO_lt),
+#            suffix = c("", "_donor")) %>%
+#  mutate(POINT_donor = replace_na(POINT_donor, 0))#
+
+#df_hcc
+```
+
+
+```{r}
+#df_hcc_wt <- df_hcc %>%
+# mutate(POINT = POINT + POINT_donor)
+
+#df_hcc_wt
+```
+
+```{r}
+df_hcc_wt <- df_hcc %>%
+  group_by(PRO_en) %>%
+  mutate(TOTAL_sum = sum(TOTAL)) %>%
+  mutate(PROP = TOTAL/TOTAL_sum) %>%
+  mutate(POINT_wt = POINT * PROP) %>%
+  summarise(POINT = sum(POINT_wt))
+
+df_hcc_wt
+```
+
+
+
+```{r}
+df_hcc_wt <- df_hcc_wt %>%
+  mutate(COST_yen = POINT * 10) %>%
+  mutate(COST_usd = COST_yen /140.62) %>%
+  mutate(AFF = (COST_yen / (1004*40*52)) *100) %>%
+  mutate(AFF_3 = 0.3* AFF) %>%
+  mutate(AFF_2 = 0.2*AFF) %>%
+  mutate(AFF_1 = 0.1*AFF)
+
+df_hcc_wt
+```
+
+```{r}
+levels_hcc <- df_hcc_wt %>% arrange(POINT) %>% pull(PRO_en)
+
+df_hcc_wt <- df_hcc_wt %>%
+  mutate(PRO_en = factor(PRO_en, levels = levels_hcc))
+```
+
+
+```{r}
+p1_c1 <- df_hcc_wt %>%
+  ggplot(aes(COST_usd, fct_reorder(PRO_en, COST_usd)))+
+  geom_col(width = 0.5,
+           fill = "#e377c2")+
+  geom_text(aes(x = COST_usd + 20000/50, y = PRO_en,
+                label  = round(COST_usd, 0) %>% scales::comma()),
+            hjust = 0, size = 2.8, colour = "black")+
+  scale_x_continuous(expand = c(0, 0),
+                     limits = c(0, 20000),
+                     breaks = seq(0, 20000, 5000),
+                     labels = label_comma())+
+  coord_cartesian(clip = "off")+
+  labs(tag = "c",
+       x = "Original cost (USD)",
+       y = "Treatment")+
+  theme_classic()+
+    theme(plot.tag = element_text(size = 12, colour = "black", face = "bold"),
+          axis.title = element_text(size = 8, colour = "black", face = "bold"),
+        axis.text.x = element_text(size = 8, colour = "black"),
+        axis.text.y = element_text(size = 8, colour = "black"),
+        axis.line = element_line(linewidth = 0.3, colour = "black"),
+        axis.ticks = element_line(linewidth = 0.3, colour = "black"),
+        legend.position = "none",
+        plot.margin = margin(0, 7.5 , 0, 0, "mm"))
+
+p1_c1 
+```
+# affordability plot
+
+```{r}
+df_hcc_wt_long <- df_hcc_wt %>%
+  pivot_longer(cols = starts_with("AFF"),
+               names_to = "AFF_cat",
+               values_to = "AFF_value")
+
+df_hcc_wt_long 
+```
+
+
+```{r}
+df_hcc_wt
+```
+
+
+```{r}
+label_aff <- df_hcc_wt %>%
+  mutate(label_1 = formatC(AFF, format = "g", digits = 3, flag = "#") %>%
+           str_remove_all("\\s")) %>%
+  mutate(label_2 = paste0(round(AFF_1, digits = 2) ,
+                        " - ",
+                        round(AFF_3, digits = 2))) %>%
+  arrange(desc(PRO_en)) %>%
+  mutate(x1 = AFF) %>%
+  bind_cols(tibble(y1 = c(4:1) + 0.3)) %>%
+  mutate(hjust1 = case_when(PRO_en %in% c("Liver\ntransplantation") ~ 0.5,
+                            PRO_en %in% c("Resection") ~ 0.5,
+                            .default = 0.5)) %>%
+  bind_cols(tibble(y2 = c(4:1) - 0.3)) %>%
+  mutate(x2 = case_when(PRO_en == "Liver\ntransplantation" ~ AFF_2,
+                       .default = 0)) %>%
+  mutate(hjust2 = case_when(PRO_en == "Liver\ntransplantation" ~ 0.5,
+                       .default = 0))
+
+label_aff
+```
+
+```{r}
+# affordability
+
+p1_c2 <- df_hcc_wt_long   %>% 
+  filter(AFF_cat %in% c("AFF") )%>%
+  ggplot(aes(x = AFF_value, y = PRO_en, colour = AFF_cat))+
+  geom_point(size = 1)+
+  scale_colour_manual(values = c("black"),
+                    name = "Cost",
+                    labels = c("Original"))+
+    geom_text(data = label_aff,
+            aes(x = x1, y = y1, label = label_1),
+            hjust = 0.5,
+             vjust = 0.5, size = 2.8, colour = "black",
+            inherit.aes = FALSE)+
+  scale_x_continuous(breaks = seq(0, 100, 25),
+                     limits = c(0, 100))+
+  coord_cartesian(clip = "off")+
+  labs(title = "Original cost",
+       x = "Affordability (%)",
+       y = "Treatment")+
+  guides(colour = guide_legend(override.aes = list(size = 2.6,
+                                                   fill=NA)))+
+  theme_classic()+
+  theme(plot.title = element_text(size = 8, colour = "black", face = "bold", hjust = 0.5),
+        axis.title.x = element_text(size = 8, colour = "black", face = "bold"),
+        axis.title.y = element_blank(),
+        axis.text.x = element_text(size = 8, colour = "black"),
+        axis.text.y = element_blank(),
+        axis.line = element_line(linewidth = 0.3, colour = "black"),
+        axis.ticks = element_line(linewidth = 0.3, colour = "black"),
+        legend.title = element_blank(),
+          #element_text(size = 8, colour = "black", face = "bold"),
+        legend.text = element_text(size = 8, colour = "black"),
+        legend.position = "none",
+        legend.position.inside = c(0.55, 0),
+        legend.justification.inside = c(0, 0),
+        legend.background = element_blank(),
+      #  legend.box.background = element_blank(),
+       # legend.margin = margin(0, 0, 0, 0),
+      legend.spacing.x = unit(0, "mm"),
+      legend.spacing.y = unit(0, "mm"),
+      legend.key.spacing.x = unit(0, "mm"),
+        legend.key.spacing.y =  unit(0, "mm"),
+      legend.key = element_rect(fill = NA),
+        plot.margin = margin(0, 5 , 0, 0, "mm"))
+
+p1_c2 
+```
+
+
+```{r}
+saveRDS(p1_c1, "../plot/p1_c1.RDS")
+saveRDS(p1_c2, "../plot/p1_c2.RDS")
+```
+
+```{r}
+saveRDS(df_hcc, "../df/analysis/df_hcc.RDS")
+```
+
+
+# end
