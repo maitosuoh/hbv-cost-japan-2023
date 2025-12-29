@@ -1,0 +1,128 @@
+---
+title: "HBV"
+output: html_document
+date: "2025-12-28"
+---
+
+```{r}
+library(openxlsx)
+library(tidyverse)
+library(readxl)
+
+library(ggplot2)
+library(ggtext)
+library(scales)
+library(cowplot)
+library(patchwork)
+library(report)
+```
+
+```{r}
+report::report(sessionInfo())
+```
+
+```{r}
+df_pack <- report::cite_packages() %>% as_tibble() %>%
+  mutate(value = as.character(value))
+```
+
+```{r}
+df_pack_long <- df_pack %>%
+  separate_longer_delim(value, delim = "- ") %>%
+  mutate(value = str_trim(value, side = "both")) %>%
+  distinct(value) %>%
+  filter(value != "")
+```
+
+
+```{r}
+df_pack_long <- df_pack_long %>%
+  mutate(Year = str_extract(value, "(?<=\\()[:digit:]+(?=\\))")) %>%
+  mutate(Version = str_extract(value, "(?<=R package version )[^\\,]+(?=\\,)")) %>%
+  mutate(Package = str_extract(value, "(?<=\\.\\s\\_)[^\\:]+(?=\\:)")) %>%
+  mutate(Source = str_extract(value, "(?<=\\<)http[^\\>]+(?=\\>)"))
+
+df_pack_long 
+```
+
+```{r}
+df_pack_long %>% View()
+```
+
+
+```{r}
+df_pack_long %>% filter(is.na(Package))
+```
+
+
+```{r}
+df_pack_long <- df_pack_long %>%
+  mutate(Package = case_when(
+                             str_detect(value, "lubridate") ~ "lubridate",
+                             str_detect(value, "Reporting") ~ "report",
+                             str_detect(value, "the tidyverse") ~ "tidyverse",
+                            
+                             .default = Package))
+```
+
+
+```{r}
+df_pack_long %>% filter(is.na(Version))
+```
+
+```{r}
+df_pack_long <- df_pack_long %>%
+  mutate(Version = case_when(
+                             Package == "lubridate" ~ "1.9.4",
+                             Package == "report" ~ "0.6.2",
+                             Package == "ggplot2" ~ "4.0.1",
+                             Package == "tidyverse" ~ "2.0.0",
+                             Package == "R" ~ "4.5.2",
+                             .default = Version))
+```
+
+```{r}
+df_pack_long %>% View()
+```
+
+
+
+```{r}
+RStudio.Version()$citation
+```
+
+```{r}
+df_pack_long <- df_pack_long %>%
+  bind_rows(tibble(Package = "RStudio",
+                   Year = "2025",
+                   Version = "2025.09.2+418",
+                   Source = "http://www.posit.co/"))
+```
+
+```{r}
+df_pack_long 
+```
+
+```{r}
+df_soft <- df_pack_long %>%
+  filter(str_detect(Package, "R"))
+```
+
+```{r}
+df_lib <-  df_pack_long %>%
+  filter(!str_detect(Package, "R"))
+```
+
+
+```{r}
+df_final <- df_soft %>%
+  bind_rows(df_lib %>% arrange(Package))
+```
+
+
+```{r}
+df_final %>%
+  select(Package, Version, Source) %>%
+  write.xlsx("../table/TableS1.xlsx")
+```
+
